@@ -126,6 +126,31 @@
     margin: 0 0 10px;
   }
 
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .section-head h2 {
+    margin: 0;
+  }
+
+  .check.selectall {
+    min-height: 28px;
+    padding: 5px 10px;
+    flex: 0 0 auto;
+  }
+
+  .check.selectall span {
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 650;
+    text-transform: none;
+  }
+
   input[type="text"],
   input[type="url"] {
     width: 100%;
@@ -202,16 +227,41 @@
   </section>
 
   <section>
-    <h2>Seeds</h2>
+    <div class="section-head">
+      <h2>Seeds</h2>
+      <label class="check selectall">
+        <input id="seedsSelectAll" type="checkbox">
+        <span>Select All</span>
+      </label>
+    </div>
     <div id="seeds" class="grid">
       <div class="empty">Loading seeds...</div>
     </div>
   </section>
 
   <section>
-    <h2>Gear</h2>
+    <div class="section-head">
+      <h2>Gear</h2>
+      <label class="check selectall">
+        <input id="gearsSelectAll" type="checkbox">
+        <span>Select All</span>
+      </label>
+    </div>
     <div id="gears" class="grid">
       <div class="empty">Loading gear...</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Props</h2>
+      <label class="check selectall">
+        <input id="propsSelectAll" type="checkbox">
+        <span>Select All</span>
+      </label>
+    </div>
+    <div id="props" class="grid">
+      <div class="empty">Loading props...</div>
     </div>
   </section>
 </main>
@@ -219,7 +269,8 @@
 <script>
   const state = {
     seeds: new Map(),
-    gears: new Map()
+    gears: new Map(),
+    props: new Map()
   };
 
   const els = {
@@ -227,9 +278,13 @@
     webhook: document.getElementById("webhook"),
     seeds: document.getElementById("seeds"),
     gears: document.getElementById("gears"),
+    props: document.getElementById("props"),
     save: document.getElementById("save"),
     start: document.getElementById("start"),
-    statusBanner: document.getElementById("statusBanner")
+    statusBanner: document.getElementById("statusBanner"),
+    seedsSelectAll: document.getElementById("seedsSelectAll"),
+    gearsSelectAll: document.getElementById("gearsSelectAll"),
+    propsSelectAll: document.getElementById("propsSelectAll")
   };
 
   function displayName(value) {
@@ -274,14 +329,58 @@
     }
   }
 
+  function syncSelectAll(selectAllEl, container, type) {
+    if (!selectAllEl) return;
+
+    const inputs = [...container.querySelectorAll(`input[type="checkbox"][data-type="${type}"]`)];
+
+    if (!inputs.length) {
+      selectAllEl.checked = false;
+      selectAllEl.indeterminate = false;
+      return;
+    }
+
+    const checkedCount = inputs.filter((input) => input.checked).length;
+    selectAllEl.checked = checkedCount === inputs.length;
+    selectAllEl.indeterminate = checkedCount > 0 && checkedCount < inputs.length;
+  }
+
+  function wireGroup(selectAllEl, container, type) {
+    if (!selectAllEl || !container) return;
+
+    selectAllEl.addEventListener("change", () => {
+      const checked = selectAllEl.checked;
+      selectAllEl.indeterminate = false;
+      container.querySelectorAll(`input[type="checkbox"][data-type="${type}"]`).forEach((input) => {
+        input.checked = checked;
+      });
+    });
+
+    container.addEventListener("change", (event) => {
+      if (event.target.matches('input[type="checkbox"]')) {
+        syncSelectAll(selectAllEl, container, type);
+      }
+    });
+  }
+
+  wireGroup(els.seedsSelectAll, els.seeds, "seed");
+  wireGroup(els.gearsSelectAll, els.gears, "gear");
+  wireGroup(els.propsSelectAll, els.props, "prop");
+
   function render() {
     renderChecks(els.seeds, state.seeds, "seed");
     renderChecks(els.gears, state.gears, "gear");
+    renderChecks(els.props, state.props, "prop");
+
+    syncSelectAll(els.seedsSelectAll, els.seeds, "seed");
+    syncSelectAll(els.gearsSelectAll, els.gears, "gear");
+    syncSelectAll(els.propsSelectAll, els.props, "prop");
   }
 
   function handleLoad(message) {
     state.seeds.clear();
     state.gears.clear();
+    state.props.clear();
 
     for (const part of message.split("|").slice(1)) {
       if (part.startsWith("navKey=")) {
@@ -294,6 +393,9 @@
       } else if (part.startsWith("gear:")) {
         const [name, value = "0"] = part.slice("gear:".length).split("=");
         state.gears.set(name, value);
+      } else if (part.startsWith("prop:")) {
+        const [name, value = "0"] = part.slice("prop:".length).split("=");
+        state.props.set(name, value);
       }
     }
 
